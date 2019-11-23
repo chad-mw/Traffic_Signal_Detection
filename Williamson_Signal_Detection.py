@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 
-videoName = "comp.avi"
+videoName = "driveVideo_Night.mp4"
 
 def main():
     frameArray = []
@@ -84,8 +84,10 @@ def getVideoFrames(persistenceArray):
                 if ((cv2.arcLength(contour,True) > scalar) and (cv2.arcLength(contour,True) < 60)):  #16 is min cutoff #60 is max cutoff
                     if (area > cv2.arcLength(contour, True)):
                         bloomSize = 4;
-                        if (x + w + bloomSize > width) or (y + h + bloomSize > height):
+                        if (x + w + bloomSize >= (width)) or (y + h + bloomSize >= (height)):
                             bloomSize = 0
+                            x  -= 1
+                            y -= 1
                         xInc = x - bloomSize
                         yInc = y - bloomSize
                         sizeToAvg = (w + (bloomSize * 2)) * (h + (bloomSize * 2))
@@ -141,13 +143,19 @@ def getVideoFrames(persistenceArray):
                             #RED values
                             if(avgR > avgG) and (avgR > avgB) and ((avgR - avgG) > 26):
                                 if (hue < 20 or hue > 340):
-                                    if (determineLight("red", image[(y-4):(y+h+4), (x-4):(x+w+4)], frameCounter, contourCount)):
-                                        redArray.append(contour)
+                                    if (x + w + 4 >= width) or (y + h + 4 >= height):
+                                        q = 0
+                                    else:
+                                        if (determineLight("red", image[(y-4):(y+h+4), (x-4):(x+w+4)], frameCounter, contourCount)):
+                                            redArray.append(contour)
                             
                             #GREEN values
                             elif ((avgG > avgB and avgG > avgR) and (lightness < 233)):
-                                    if (determineLight("green", image[(y-4):(y+h+4), (x-4):(x+w+4)], frameCounter, contourCount)):
-                                        greenArray.append(contour)
+                                    if (x + w + 4 >= width) or (y + h + 4 >= height):
+                                        q = 0
+                                    else:
+                                        if (determineLight("green", image[(y-4):(y+h+4), (x-4):(x+w+4)], frameCounter, contourCount)):
+                                            greenArray.append(contour)
 
             
             ###for contour in redArray:
@@ -168,6 +176,8 @@ def getVideoFrames(persistenceArray):
 def determineLight(color, image, frameNum, contourNum):
     path = 'C:/Users/Chad/Documents/IUPUI/Fall 2019/CSCI43500 Multimedia Systems/Traffic_Signal_Detection/imageData/'
     height, width, layers = image.shape
+    if (height == 0 or width == 0):
+        return False
     dupImage = image.copy()
     detBool = True
     detCount = 0
@@ -206,19 +216,28 @@ def determineLight(color, image, frameNum, contourNum):
 
 def framePersistence(pArray, fArray):
             
-    frameNum = 1
-    while (frameNum < (len(pArray) - 1)):
+    frameNum = 2
+    while (frameNum < (len(pArray) - 2)):
         #current frame information
         currentImage = pArray[frameNum][0]
         currentRed = pArray[frameNum][1]
         currentGreen = pArray[frameNum][2]
+        
         #previous frame information
         previousRed = pArray[frameNum - 1][1]
         previousGreen = pArray[frameNum - 1][2]
         
+        #previously previous frame information
+        furthestPreviousRed = pArray[frameNum - 2][1]
+        furthestPreviousGreen = pArray[frameNum - 2][2]
+        
         #next frame information
         nextRed = pArray[frameNum + 1][1]
         nextGreen = pArray[frameNum + 1][2]
+        
+        #next next frame information
+        furthestNextRed = pArray[frameNum + 2][1]
+        furthestNextGreen = pArray[frameNum + 2][2]
         
         drawR = 0
         drawG = 0
@@ -233,13 +252,25 @@ def framePersistence(pArray, fArray):
             for pastContour in previousRed:
                 px, py, pw, ph = cv2.boundingRect(pastContour)
                 if (abs((px - x) < 5)) and (abs((py - y) < 5)):
-                    drawR += .5
+                    drawR += .3
+                    
+            #look at all contours in 2nd previous frame. was there one close to this contour?
+            for past2Contour in furthestPreviousRed:
+                px, py, pw, ph = cv2.boundingRect(past2Contour)
+                if (abs((px - x) < 5)) and (abs((py - y) < 5)):
+                    drawR += .2
+                    
             #do the same for all contours in next frame. is there one close to this contour?
             for futureContour in nextRed:
                 fx, fy, fw, fh = cv2.boundingRect(futureContour)
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
-                    drawR += .5
+                    drawR += .3
                     
+            #do the same for all contours in next frame. is there one close to this contour?
+            for future2Contour in furthestNextRed:
+                fx, fy, fw, fh = cv2.boundingRect(future2Contour)
+                if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
+                    drawR += .2
             #draw
             if (drawR > 1):
                 cv2.rectangle(currentImage, (x - 5, y - 5), (x+w+5, y+h+5), (0, 0, 255), 2)
@@ -254,12 +285,24 @@ def framePersistence(pArray, fArray):
             for pastContour in previousGreen:
                 px, py, pw, ph = cv2.boundingRect(pastContour)
                 if (abs((px - x) < 5)) and (abs((py - y) < 5)):
-                    drawG += .5
+                    drawG += .3
+                    
+            #look at all contours in 2nd previous frame. was there one close to this contour?
+            for past2Contour in furthestPreviousGreen:
+                px, py, pw, ph = cv2.boundingRect(past2Contour)
+                if (abs((px - x) < 5)) and (abs((py - y) < 5)):
+                    drawG += .2
             #do the same for all contours in next frame. is there one close to this contour?
             for futureContour in nextGreen:
                 fx, fy, fw, fh = cv2.boundingRect(futureContour)
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
-                    drawG += .5
+                    drawG += .3
+                    
+            #do the same for all contours in next frame. is there one close to this contour?
+            for future2Contour in furthestNextGreen:
+                fx, fy, fw, fh = cv2.boundingRect(future2Contour)
+                if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
+                    drawG += .2
                     
             #draw
             if (drawG > 1):
