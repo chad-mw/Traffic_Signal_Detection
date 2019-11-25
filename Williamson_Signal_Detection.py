@@ -1,18 +1,20 @@
 #Chad Williamson
+#CS 435 Fall 2019
 
 import os
 import numpy as np
 import cv2
 
 
-videoName = "comp.avi"
+videoName = "flash.avi"
 
 def main():
+    #
     frameArray = []
-    persistenceArray = []
+    contourArray = []
     
-    getVideoFrames(persistenceArray)
-    framePersistence(persistenceArray, frameArray)
+    getVideoFrames(contourArray)
+    framePersistence(contourArray, frameArray)
     writeFrames(frameArray)
     print("Complete")
     
@@ -20,65 +22,71 @@ def main():
     
     
     
-def getVideoFrames(persistenceArray):
+def getVideoFrames(contourArray):
     path = 'C:/Users/Chad/Documents/IUPUI/Fall 2019/CSCI43500 Multimedia Systems/Traffic_Signal_Detection/imageData/'
     sourceVideo = cv2.VideoCapture(videoName)
+    
     total = int(sourceVideo.get(cv2.CAP_PROP_FRAME_COUNT))
     mask = cv2.imread('mask.png',0)
+    
     frameCounter = 0
     validFrame = 1
-    while (validFrame): #currently only reading the first 100 frames
-    #while (validFrame and (frameCounter < 50)): #currently only reading the first 100 frames
-        x = 0
-        y = 0
-        pxVal = 0
-        newPxVal = 0
+    while (validFrame): 
+
         
         #image variable is the frame of the video, validFrame is loop condition
         validFrame, image = sourceVideo.read()
         
+        
         if(validFrame):
             height, width, layers = image.shape
-            newImage = image
+            newImage = image.copy()
 
             
             #create grayscale
             grayscaleImage = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            
+
             #add mask to block portion of video that is not needed
             masked = cv2.bitwise_and(grayscaleImage,mask)
             
-            #########################################################
+            
             #apply thresholding
             ret, thresh = cv2.threshold(masked, 245, 255, cv2.THRESH_BINARY)
-            #get a kernel
+            
+            #set kernel of size 3 by 3
             kernel = np.ones((3,3),np.uint8)
-            #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
+            
+            #apply morphological transformations
             erosion = cv2.erode(thresh,kernel,iterations = 1)
+            
+            #set elliptical kernel of size 3 by 3
             Ekernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
             dilate = cv2.dilate(erosion,Ekernel,iterations = 1)
-            
-            #
             blackhat = cv2.morphologyEx(dilate, cv2.MORPH_BLACKHAT, kernel)
             dilate = cv2.bitwise_xor(dilate,blackhat)
 
-            # Find the edges in the image using canny detector                        
-            edgesB = cv2.Canny(dilate, 180, 200)  
+            # Find the edges in the image using canny edge detector                        
+            edges = cv2.Canny(dilate, 180, 200)  
             
             #contours
-            contoursB, hierarchyB = cv2.findContours(edgesB, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)#contours  
+            contours, hierarchy = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)  
 
+            #temporary arrays to hold frame contours
             redArray = []
             greenArray = []
             contourCount = 0
-            for contour in contoursB:
+            
+            for contour in contours:
                 approx = cv2.approxPolyDP(contour, 00.01*cv2.arcLength(contour,True),True)
                 area = cv2.contourArea(contour)
                 x,y,w,h = cv2.boundingRect(contour)
+                
+                #scalar defines the minimum cutoff value. as contour y value approaches the lower part of the frame, the scalar is smaller
                 scalar = (((((320 - y) / 320)  * 2) + 1) * 16)
                 if (y >= 320):
                     scalar = 16
-                if ((cv2.arcLength(contour,True) > scalar) and (cv2.arcLength(contour,True) < 60)):  #16 is min cutoff #60 is max cutoff
+                #allow if within size threshold
+                if ((cv2.arcLength(contour,True) > scalar) and (cv2.arcLength(contour,True) < 60)):
                     if (area > cv2.arcLength(contour, True)):
                         bloomSize = 4;
                         if (x + w + bloomSize >= (width)) or (y + h + bloomSize >= (height)):
@@ -154,18 +162,8 @@ def getVideoFrames(persistenceArray):
                                         if (determineLight("green", image[(y-4):(y+h+4), (x-4):(x+w+4)], frameCounter, contourCount)):
                                             greenArray.append(contour)
 
-            
-            ###for contour in redArray:
-            ###    x,y,w,h = cv2.boundingRect(contour)
-            ###    cv2.rectangle(newImage, (x - 5, y - 5), (x+w+5, y+h+5), (0, 0, 255), 2)
-            ###for contour in greenArray:
-            ###    x,y,w,h = cv2.boundingRect(contour)
-            ###    cv2.rectangle(newImage, (x - 5, y - 5), (x+w+5, y+h+5), (0, 255, 0), 2)
-
-
-            persistenceArray.append([image, redArray, greenArray])
-            ###frameArray.append(newImage)
-            
+            #send to contourArray
+            contourArray.append([image, redArray, greenArray])
             print("Processing: " + str(round((frameCounter / total) * 100)) + "%")
             frameCounter += 1
 
@@ -206,13 +204,12 @@ def determineLight(color, image, frameNum, contourNum):
                 radius = i[2]
                 cv2.circle(image, center, radius, (255, 0, 255), 3)
             detBool = True
-        #else:       
-        #    cv2.imwrite(os.path.join(path , (str(frameNum) + "_" + str(contourNum)+ "_" + color +  ".png")), dupImage)
 
     return detBool
 
 def framePersistence(pArray, fArray):
             
+    #set to 2 and read to (end of array - 2) to allow for reading future and previous frame data
     frameNum = 2
     while (frameNum < (len(pArray) - 2)):
         #current frame information
@@ -263,7 +260,7 @@ def framePersistence(pArray, fArray):
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
                     drawR += .3
                     
-            #do the same for all contours in next frame. is there one close to this contour?
+            #do the same for all contours in next next frame. is there one close to this contour?
             for future2Contour in furthestNextRed:
                 fx, fy, fw, fh = cv2.boundingRect(future2Contour)
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
@@ -295,7 +292,7 @@ def framePersistence(pArray, fArray):
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
                     drawG += .3
                     
-            #do the same for all contours in next frame. is there one close to this contour?
+            #do the same for all contours in next next frame. is there one close to this contour?
             for future2Contour in furthestNextGreen:
                 fx, fy, fw, fh = cv2.boundingRect(future2Contour)
                 if (abs((fx - x) < 5)) and (abs((fy - y) < 5)):
@@ -303,10 +300,7 @@ def framePersistence(pArray, fArray):
                     
             #draw
             if (drawG > 1):
-                #print(drawG)
                 cv2.rectangle(currentImage, (x - 5, y - 5), (x+w+5, y+h+5), (0, 255, 0), 2)
-
-
 
         frameNum += 1
         fArray.append(currentImage)
@@ -315,7 +309,7 @@ def writeFrames(frameArray):
     size = (1280,720)
     out = cv2.VideoWriter('projectVideo.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
     for i in range(len(frameArray)):
-        out.write(frameArray[i])
+        out.write(frameArray[i]) 
         print("Writing: " + str(round((i / len(frameArray)) * 100)) + "%")
     out.release()
 
