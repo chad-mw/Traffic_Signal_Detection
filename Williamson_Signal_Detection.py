@@ -5,7 +5,7 @@ import numpy as np
 import cv2
 
 
-videoName = "driveVideo_Night.mp4"
+videoName = "comp.avi"
 
 def main():
     frameArray = []
@@ -55,10 +55,7 @@ def getVideoFrames(persistenceArray):
             kernel = np.ones((3,3),np.uint8)
             #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
             erosion = cv2.erode(thresh,kernel,iterations = 1)
-            
-            
             Ekernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(3,3))
-            
             dilate = cv2.dilate(erosion,Ekernel,iterations = 1)
             
             #
@@ -169,7 +166,7 @@ def getVideoFrames(persistenceArray):
             persistenceArray.append([image, redArray, greenArray])
             ###frameArray.append(newImage)
             
-            print(str(round((frameCounter / total) * 100)) + "%")
+            print("Processing: " + str(round((frameCounter / total) * 100)) + "%")
             frameCounter += 1
 
 
@@ -306,7 +303,7 @@ def framePersistence(pArray, fArray):
                     
             #draw
             if (drawG > 1):
-                print(drawG)
+                #print(drawG)
                 cv2.rectangle(currentImage, (x - 5, y - 5), (x+w+5, y+h+5), (0, 255, 0), 2)
 
 
@@ -319,7 +316,7 @@ def writeFrames(frameArray):
     out = cv2.VideoWriter('projectVideo.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
     for i in range(len(frameArray)):
         out.write(frameArray[i])
-        print((i / len(frameArray)) * 100)
+        print("Writing: " + str(round((i / len(frameArray)) * 100)) + "%")
     out.release()
 
 
