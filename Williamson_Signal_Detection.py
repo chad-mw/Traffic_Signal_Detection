@@ -307,7 +307,11 @@ def framePersistence(pArray, fArray):
     
 def writeFrames(frameArray):
     size = (1280,720)
-    out = cv2.VideoWriter('projectVideo.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
+    #avi output
+    #out = cv2.VideoWriter('projectVideo.avi', cv2.VideoWriter_fourcc(*'DIVX'), 30, size)
+    
+    #mp4 output
+    out = cv2.VideoWriter('projectVideoOutput.mp4', cv2.VideoWriter_fourcc(*'MP4V'), 30.0, size)
     for i in range(len(frameArray)):
         out.write(frameArray[i]) 
         print("Writing: " + str(round((i / len(frameArray)) * 100)) + "%")
